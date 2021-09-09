@@ -1,0 +1,4 @@
+module insert_dylib {
+  header "insert_dylib.h"
+  export *
+}
