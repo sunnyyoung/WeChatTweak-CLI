@@ -28,10 +28,24 @@ struct Framework {
     static let binary = framework.appending("/WeChatTweak")
 }
 
-enum CLIError: Error {
+enum CLIError: LocalizedError {
+    case permission
     case downloading(Error)
     case insertDylib
     case executing(command: String, error: NSDictionary)
+
+    var errorDescription: String? {
+        switch self {
+        case .permission:
+            return "Please run with `sudo`."
+        case let .downloading(error):
+            return "Download failed: \(error)"
+        case .insertDylib:
+            return "Insert dylib failed"
+        case let .executing(command, error):
+            return "Execute command: \(command) failed: \(error)"
+        }
+    }
 }
 
 enum Action: String, EnumerableFlag {
@@ -47,6 +61,8 @@ struct Tweak: ParsableCommand {
         switch action {
         case .install:
             firstly {
+                check()
+            }.then {
                 cleanup()
             }.then {
                 backup()
@@ -64,11 +80,13 @@ struct Tweak: ParsableCommand {
                 print("Install success!")
                 cleanup().done { Darwin.exit(EXIT_SUCCESS) }
             }.catch { error in
-                print("Install failed: \(error)")
+                print("Install failed: \(error.localizedDescription)")
                 cleanup().done { Darwin.exit(EXIT_FAILURE) }
             }
         case .uninstall:
             firstly {
+                check()
+            }.then {
                 cleanup()
             }.then {
                 restore()
@@ -86,6 +104,14 @@ struct Tweak: ParsableCommand {
 }
 
 private extension Tweak {
+    func check() -> Promise<Void> {
+        if getuid() == 0 {
+            return .value(())
+        } else {
+            return .init(error: CLIError.permission)
+        }
+    }
+
     func backup() -> Promise<Void> {
         return Promise { seal in
             do {
@@ -186,8 +212,7 @@ private extension Tweak {
 
     private func move() -> Promise<Void> {
         return execute(
-            command: "rm -rf \(Location.Applications.appendingPathComponent(App.app).path); mv \(Location.Temp.appendingPathComponent(App.app).path) \(Location.Applications.appendingPathComponent(App.app).path)",
-            privilege: true
+            command: "rm -rf \(Location.Applications.appendingPathComponent(App.app).path); mv \(Location.Temp.appendingPathComponent(App.app).path) \(Location.Applications.appendingPathComponent(App.app).path)"
         )
     }
 
@@ -203,18 +228,11 @@ private extension Tweak {
 }
 
 private extension Tweak {
-    func execute(command: String, privilege: Bool = false) -> Promise<Void> {
+    func execute(command: String) -> Promise<Void> {
         return Promise { seal in
-            print("Execute command: \(privilege ? "sudo " : "")\(command)")
+            print("Execute command: \(command)")
             var error: NSDictionary?
-            let source: String = {
-                if privilege {
-                    return "do shell script \"\(command)\" with administrator privileges"
-                } else {
-                    return "do shell script \"\(command)\""
-                }
-            }()
-            guard let script = NSAppleScript(source: source) else {
+            guard let script = NSAppleScript(source: "do shell script \"\(command)\"") else {
                 return seal.reject(CLIError.executing(command: command, error: ["error": "Create script failed."]))
             }
             script.executeAndReturnError(&error)
