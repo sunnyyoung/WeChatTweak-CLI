@@ -18,7 +18,7 @@ OPTIONS:
 
 ## Install
 
-## Homebrew
+### Homebrew
 
 You can install [wechattweak-cli](https://github.com/Sunnyyoung/WeChatTweak-CLI) via Homebrew.
 
@@ -27,7 +27,7 @@ $ brew tap sunnyyoung/repo
 $ brew install wechattweak-cli
 ```
 
-## Manual
+### Manual
 
 1. Download the [wechattweak-cli](https://github.com/Sunnyyoung/WeChatTweak-CLI/releases/latest/download/wechattweak-cli)
 2. Remove file attributes: `xattr -d com.apple.quarantine wechattweak-cli`
