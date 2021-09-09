@@ -91,6 +91,7 @@ DerivedData/
 ### SwiftPackageManager ###
 Packages
 .build/
+.swiftpm/
 xcuserdata
 DerivedData/
 *.xcodeproj
