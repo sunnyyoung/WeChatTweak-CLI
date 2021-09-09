@@ -12,16 +12,40 @@ OPTIONS:
   -h, --help              Show help information.
 ```
 
-## Usage
+## Requirements
+
+- macOS 10.11 or later.
+
+## Install
+
+## Homebrew
+
+You can install [wechattweak-cli](https://github.com/Sunnyyoung/WeChatTweak-CLI) via Homebrew.
+
+```bash
+$ brew tap sunnyyoung/repo
+$ brew install wechattweak-cli
+```
+
+## Manual
 
 1. Download the [wechattweak-cli](https://github.com/Sunnyyoung/WeChatTweak-CLI/releases/latest/download/wechattweak-cli)
-2. Make sure the binary executable: `chmod + x wechattweak-cli`
-3. Run: `wechattweak-cli --install`
+2. Remove file attributes: `xattr -d com.apple.quarantine wechattweak-cli`
+3. Make sure the binary executable: `chmod + x wechattweak-cli`
+4. Run: `wechattweak-cli --install`
 
-For more usage: `$ wechattweak-cli --help`.
+## Usage
+
+```bash
+$ sudo wechattweak-cli --install   # Install
+$ sudo wechattweak-cli --uninstall # Uninstall
+```
+
+For more usage, run: `wechattweak-cli --help`.
 
 ## TODO
 
+- [x] Add homebrew support
 - [ ] Add upgrade action
 
 ## License
