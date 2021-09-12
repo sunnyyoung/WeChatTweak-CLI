@@ -9,23 +9,20 @@ struct Constant {
     static let url = URL(string: "https://github.com/Sunnyyoung/WeChatTweak-macOS/releases/latest/download/WeChatTweak.framework.zip")!
 }
 
-struct Location {
-    static let Applications = URL(fileURLWithPath: "/Applications")
-    static let Temp = URL(fileURLWithPath: "/tmp")
-    static let zip = URL(fileURLWithPath: "/tmp/Tweak.zip")
-    static let binary = URL(fileURLWithPath: "/tmp/WeChat")
-}
-
 struct App {
-    static let app = "WeChat.app"
+    static let root = "/Applications"
+    static let app = root.appending("/WeChat.app")
     static let macos = app.appending("/Contents/MacOS")
     static let binary = app.appending("/Contents/MacOS/WeChat")
     static let backup = app.appending("/Contents/MacOS/WeChat.bak")
+
+    static let framework = macos.appending("/WeChatTweak.framework")
 }
 
-struct Framework {
-    static let framework = "WeChatTweak.framework"
-    static let binary = framework.appending("/WeChatTweak")
+struct Temp {
+    static let root = "/tmp"
+    static let binary = root.appending("/WeChat")
+    static let zip = root.appending("/WeChatTweak.zip")
 }
 
 enum CLIError: LocalizedError {
@@ -39,7 +36,7 @@ enum CLIError: LocalizedError {
         case .permission:
             return "Please run with `sudo`."
         case let .downloading(error):
-            return "Download failed: \(error)"
+            return "Download failed with error: \(error)"
         case .insertDylib:
             return "Insert dylib failed"
         case let .executing(command, error):
@@ -74,14 +71,12 @@ struct Tweak: ParsableCommand {
                 insert()
             }.then {
                 codesign()
-            }.then {
-                move()
             }.done {
                 print("Install success!")
-                cleanup().done { Darwin.exit(EXIT_SUCCESS) }
             }.catch { error in
                 print("Install failed: \(error.localizedDescription)")
-                cleanup().done { Darwin.exit(EXIT_FAILURE) }
+            }.finally {
+                CFRunLoopStop(CFRunLoopGetCurrent())
             }
         case .uninstall:
             firstly {
@@ -90,40 +85,41 @@ struct Tweak: ParsableCommand {
                 cleanup()
             }.then {
                 restore()
-            }.then {
-                move()
             }.done {
                 print("Uninstall success!")
-                cleanup().done { Darwin.exit(EXIT_SUCCESS) }
             }.catch { error in
                 print("Uninstall failed: \(error)")
-                cleanup().done { Darwin.exit(EXIT_FAILURE) }
+            }.finally {
+                CFRunLoopStop(CFRunLoopGetCurrent())
             }
         }
     }
 }
 
+// MARK: Steps
 private extension Tweak {
     func check() -> Promise<Void> {
-        if getuid() == 0 {
-            return .value(())
-        } else {
-            return .init(error: CLIError.permission)
+        return getuid() == 0 ? .value(()) : .init(error: CLIError.permission)
+    }
+
+    private func cleanup() -> Guarantee<Void> {
+        return Guarantee { seal in
+            try? FileManager.default.removeItem(atPath: Temp.zip)
+            try? FileManager.default.removeItem(atPath: Temp.binary)
+            seal(())
         }
     }
 
     func backup() -> Promise<Void> {
+        print("------ Backup ------")
         return Promise { seal in
             do {
-                print("Backup WeChat...")
-                try FileManager.default.copyItem(
-                    at: Location.Applications.appendingPathComponent(App.app),
-                    to: Location.Temp.appendingPathComponent(App.app)
-                )
-                try FileManager.default.copyItem(
-                    at: Location.Temp.appendingPathComponent(App.binary),
-                    to: Location.Temp.appendingPathComponent(App.backup)
-                )
+                if FileManager.default.fileExists(atPath: App.backup) {
+                    print("WeChat.bak exists, skip it...")
+                } else {
+                    try FileManager.default.copyItem(atPath: App.binary, toPath: App.backup)
+                    print("Created WeChat.bak...")
+                }
                 seal.fulfill(())
             } catch {
                 seal.reject(error)
@@ -132,23 +128,17 @@ private extension Tweak {
     }
 
     func restore() -> Promise<Void> {
+        print("------ Restore ------")
         return Promise { seal in
             do {
-                print("Restore WeChat...")
-                try FileManager.default.copyItem(
-                    at: Location.Applications.appendingPathComponent(App.app),
-                    to: Location.Temp.appendingPathComponent(App.app)
-                )
-                try FileManager.default.removeItem(
-                    at: Location.Temp.appendingPathComponent(App.binary)
-                )
-                try FileManager.default.moveItem(
-                    at: Location.Temp.appendingPathComponent(App.backup),
-                    to: Location.Temp.appendingPathComponent(App.binary)
-                )
-                try? FileManager.default.removeItem(
-                    at: Location.Temp.appendingPathComponent(App.macos).appendingPathComponent(Framework.framework)
-                )
+                if FileManager.default.fileExists(atPath: App.backup) {
+                    try FileManager.default.removeItem(atPath: App.binary)
+                    try FileManager.default.moveItem(atPath: App.backup, toPath: App.binary)
+                    try? FileManager.default.removeItem(atPath: App.framework)
+                    print("Restored WeChat...")
+                } else {
+                    print("WeChat.bak not exists, skip it...")
+                }
                 seal.fulfill(())
             } catch {
                 seal.reject(error)
@@ -157,10 +147,10 @@ private extension Tweak {
     }
 
     private func download() -> Promise<Void> {
+        print("------ Download ------")
         return Promise { seal in
-            print("Download resource...")
             let destination: DownloadRequest.DownloadFileDestination = { _, _ in
-                return (Location.zip, [.removePreviousFile])
+                return (.init(fileURLWithPath: Temp.zip), [.removePreviousFile])
             }
             Alamofire.download(Constant.url, to: destination).response { response in
                 if let error = response.error {
@@ -173,60 +163,30 @@ private extension Tweak {
     }
 
     private func unzip() -> Promise<Void> {
-        return execute(
-            command: "unzip \(Location.zip.path) -d \(Location.Temp.appendingPathComponent(App.macos).path)"
-        )
+        print("------ Unzip ------")
+        return execute(command: "rm -rf \(App.framework); unzip \(Temp.zip) -d \(App.macos)")
     }
 
     private func insert() -> Promise<Void> {
+        print("------ Insert Dylib ------")
         return Promise { seal in
-            print("Insert dylib...")
-            insert_dylib.insert(
-                "@executable_path/WeChatTweak.framework/WeChatTweak",
-                Location.Temp.appendingPathComponent(App.binary).path
-            ) == EXIT_SUCCESS ? seal.fulfill(()) : seal.reject(CLIError.insertDylib)
+            insert_dylib.insert("@executable_path/WeChatTweak.framework/WeChatTweak", App.binary) == EXIT_SUCCESS ? seal.fulfill(()) : seal.reject(CLIError.insertDylib)
         }
     }
 
     private func codesign() -> Promise<Void> {
+        print("------ Codesign ------")
         return firstly {
-            Promise.value(
-                try FileManager.default.moveItem(
-                    at: Location.Temp.appendingPathComponent(App.binary),
-                    to: Location.binary
-                )
-            )
+            Promise.value(try FileManager.default.moveItem(atPath: App.binary, toPath: Temp.binary))
         }.then {
-            execute(
-                command: "codesign --force --deep --sign - \(Location.binary.path)"
-            )
+            execute(command: "codesign --force --deep --sign - \(Temp.binary)")
         }.then {
-            Promise.value(
-                try FileManager.default.moveItem(
-                    at: Location.binary,
-                    to: Location.Temp.appendingPathComponent(App.binary)
-                )
-            )
-        }
-    }
-
-    private func move() -> Promise<Void> {
-        return execute(
-            command: "rm -rf \(Location.Applications.appendingPathComponent(App.app).path); mv \(Location.Temp.appendingPathComponent(App.app).path) \(Location.Applications.appendingPathComponent(App.app).path)"
-        )
-    }
-
-    @discardableResult
-    private func cleanup() -> Guarantee<Void> {
-        return Guarantee { seal in
-            print("Cleanup...")
-            try? FileManager.default.removeItem(at: Location.zip)
-            try? FileManager.default.removeItem(at: Location.Temp.appendingPathComponent(App.app))
-            seal(())
+            Promise.value(try FileManager.default.moveItem(atPath: Temp.binary, toPath: App.binary))
         }
     }
 }
 
+// MARK: Command
 private extension Tweak {
     func execute(command: String) -> Promise<Void> {
         return Promise { seal in
@@ -245,5 +205,10 @@ private extension Tweak {
     }
 }
 
+defer {
+    try? FileManager.default.removeItem(atPath: Temp.zip)
+    try? FileManager.default.removeItem(atPath: Temp.binary)
+}
+
 Tweak.main()
-RunLoop.main.run()
+CFRunLoopRun()
