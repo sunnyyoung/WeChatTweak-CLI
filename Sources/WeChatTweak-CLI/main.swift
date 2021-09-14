@@ -52,7 +52,7 @@ enum Action: String, EnumerableFlag {
 
 struct Tweak: ParsableCommand {
     @Flag(help: "Install or Uninstall tweak")
-    var action = Action.install
+    var action: Action
 
     func run() throws {
         switch action {
