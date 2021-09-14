@@ -177,11 +177,11 @@ private extension Tweak {
     private func codesign() -> Promise<Void> {
         print("------ Codesign ------")
         return firstly {
-            Promise.value(try FileManager.default.moveItem(atPath: App.binary, toPath: Temp.binary))
+            execute(command: "cp \(App.binary) \(Temp.binary)")
         }.then {
             execute(command: "codesign --force --deep --sign - \(Temp.binary)")
         }.then {
-            Promise.value(try FileManager.default.moveItem(atPath: Temp.binary, toPath: App.binary))
+            execute(command: "cp \(Temp.binary) \(App.binary)")
         }
     }
 }
