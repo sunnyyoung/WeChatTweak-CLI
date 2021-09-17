@@ -95,3 +95,7 @@ Packages
 xcuserdata
 DerivedData/
 *.xcodeproj
+
+### Release ###
+
+wechattweak-cli
