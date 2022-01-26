@@ -45,164 +45,79 @@ enum CLIError: LocalizedError {
     }
 }
 
-enum Action: String, EnumerableFlag {
-    case install
-    case uninstall
+struct Install: ParsableCommand {
+    static var configuration = CommandConfiguration(abstract: "Install or upgrade tweak.")
+
+    func run() throws {
+        firstly {
+            Command.check()
+        }.then {
+            Command.cleanup()
+        }.then {
+            Command.backup()
+        }.then {
+            Command.download()
+        }.then {
+            Command.unzip()
+        }.then {
+            Command.insert()
+        }.then {
+            Command.codesign()
+        }.done {
+            print("Install success!")
+        }.catch { error in
+            print("Install failed: \(error.localizedDescription)")
+        }.finally {
+            CFRunLoopStop(CFRunLoopGetCurrent())
+        }
+    }
+}
+
+struct Uninstall: ParsableCommand {
+    static var configuration = CommandConfiguration(abstract: "Uninstall tweak.")
+
+    func run() throws {
+        firstly {
+            Command.check()
+        }.then {
+            Command.cleanup()
+        }.then {
+            Command.restore()
+        }.done {
+            print("Uninstall success!")
+        }.catch { error in
+            print("Uninstall failed: \(error)")
+        }.finally {
+            CFRunLoopStop(CFRunLoopGetCurrent())
+        }
+    }
+}
+
+struct Resign: ParsableCommand {
+    static var configuration = CommandConfiguration(abstract: "Force resign WeChat.app")
+
+    func run() throws {
+        firstly {
+            Command.codesign()
+        }.catch { error in
+            print("Resign failed: \(error.localizedDescription)")
+        }.finally {
+            CFRunLoopStop(CFRunLoopGetCurrent())
+        }
+    }
 }
 
 struct Tweak: ParsableCommand {
-    @Flag(help: "Install or Uninstall tweak")
-    var action: Action
-
-    func run() throws {
-        switch action {
-        case .install:
-            firstly {
-                check()
-            }.then {
-                cleanup()
-            }.then {
-                backup()
-            }.then {
-                download()
-            }.then {
-                unzip()
-            }.then {
-                insert()
-            }.then {
-                codesign()
-            }.done {
-                print("Install success!")
-            }.catch { error in
-                print("Install failed: \(error.localizedDescription)")
-            }.finally {
-                CFRunLoopStop(CFRunLoopGetCurrent())
-            }
-        case .uninstall:
-            firstly {
-                check()
-            }.then {
-                cleanup()
-            }.then {
-                restore()
-            }.done {
-                print("Uninstall success!")
-            }.catch { error in
-                print("Uninstall failed: \(error)")
-            }.finally {
-                CFRunLoopStop(CFRunLoopGetCurrent())
-            }
-        }
-    }
-}
-
-// MARK: Steps
-private extension Tweak {
-    func check() -> Promise<Void> {
-        return getuid() == 0 ? .value(()) : .init(error: CLIError.permission)
-    }
-
-    private func cleanup() -> Guarantee<Void> {
-        return Guarantee { seal in
-            try? FileManager.default.removeItem(atPath: Temp.zip)
-            try? FileManager.default.removeItem(atPath: Temp.binary)
-            seal(())
-        }
-    }
-
-    func backup() -> Promise<Void> {
-        print("------ Backup ------")
-        return Promise { seal in
-            do {
-                if FileManager.default.fileExists(atPath: App.backup) {
-                    print("WeChat.bak exists, skip it...")
-                } else {
-                    try FileManager.default.copyItem(atPath: App.binary, toPath: App.backup)
-                    print("Created WeChat.bak...")
-                }
-                seal.fulfill(())
-            } catch {
-                seal.reject(error)
-            }
-        }
-    }
-
-    func restore() -> Promise<Void> {
-        print("------ Restore ------")
-        return Promise { seal in
-            do {
-                if FileManager.default.fileExists(atPath: App.backup) {
-                    try FileManager.default.removeItem(atPath: App.binary)
-                    try FileManager.default.moveItem(atPath: App.backup, toPath: App.binary)
-                    try? FileManager.default.removeItem(atPath: App.framework)
-                    print("Restored WeChat...")
-                } else {
-                    print("WeChat.bak not exists, skip it...")
-                }
-                seal.fulfill(())
-            } catch {
-                seal.reject(error)
-            }
-        }
-    }
-
-    private func download() -> Promise<Void> {
-        print("------ Download ------")
-        return Promise { seal in
-            let destination: DownloadRequest.DownloadFileDestination = { _, _ in
-                return (.init(fileURLWithPath: Temp.zip), [.removePreviousFile])
-            }
-            Alamofire.download(Constant.url, to: destination).response { response in
-                if let error = response.error {
-                    seal.reject(CLIError.downloading(error))
-                } else {
-                    seal.fulfill(())
-                }
-            }
-        }
-    }
-
-    private func unzip() -> Promise<Void> {
-        print("------ Unzip ------")
-        return execute(command: "rm -rf \(App.framework); unzip \(Temp.zip) -d \(App.macos)")
-    }
-
-    private func insert() -> Promise<Void> {
-        print("------ Insert Dylib ------")
-        return Promise { seal in
-            insert_dylib.insert("@executable_path/WeChatTweak.framework/WeChatTweak", App.binary) == EXIT_SUCCESS ? seal.fulfill(()) : seal.reject(CLIError.insertDylib)
-        }
-    }
-
-    private func codesign() -> Promise<Void> {
-        print("------ Codesign ------")
-        return firstly {
-            execute(command: "cp \(App.binary) \(Temp.binary)")
-        }.then {
-            execute(command: "codesign --force --deep --sign - \(Temp.binary)")
-        }.then {
-            execute(command: "cp \(Temp.binary) \(App.binary)")
-        }
-    }
-}
-
-// MARK: Command
-private extension Tweak {
-    func execute(command: String) -> Promise<Void> {
-        return Promise { seal in
-            print("Execute command: \(command)")
-            var error: NSDictionary?
-            guard let script = NSAppleScript(source: "do shell script \"\(command)\"") else {
-                return seal.reject(CLIError.executing(command: command, error: ["error": "Create script failed."]))
-            }
-            script.executeAndReturnError(&error)
-            if let error = error {
-                seal.reject(CLIError.executing(command: command, error: error))
-            } else {
-                seal.fulfill(())
-            }
-        }
-    }
+    static var configuration = CommandConfiguration(
+        commandName: "WeChatTwaek-CLI",
+        abstract: "A command line utility to work with WeChatTweak-macOS.",
+        subcommands: [
+            Install.self,
+            Uninstall.self,
+            Resign.self
+        ],
+        defaultSubcommand: Self.self
+    )
 }
 
 defer {
