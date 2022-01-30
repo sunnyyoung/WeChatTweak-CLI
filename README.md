@@ -5,11 +5,19 @@ A command line utility to work with WeChatTweak-macOS.
 ## Overview
 
 ```bash
-USAGE: tweak [--install] [--uninstall]
+OVERVIEW: A command line utility to work with WeChatTweak-macOS.
+
+USAGE: wechattweak-cli <subcommand>
 
 OPTIONS:
-  --install/--uninstall   Install or Uninstall tweak (default: install)
   -h, --help              Show help information.
+
+SUBCOMMANDS:
+  install                 Install or upgrade tweak.
+  uninstall               Uninstall tweak.
+  resign                  Force resign WeChat.app
+
+  See 'wechattweak-cli help <subcommand>' for detailed help.
 ```
 
 ## Requirements
@@ -33,15 +41,6 @@ $ brew install sunnyyoung/repo/wechattweak-cli
 2. Remove file attributes: `xattr -d com.apple.quarantine wechattweak-cli`
 3. Make sure the binary executable: `chmod +x wechattweak-cli`
 4. Run: `wechattweak-cli --install`
-
-## Usage
-
-```bash
-$ sudo wechattweak-cli --install   # Install
-$ sudo wechattweak-cli --uninstall # Uninstall
-```
-
-For more usage, run: `wechattweak-cli --help`.
 
 ## License
 
