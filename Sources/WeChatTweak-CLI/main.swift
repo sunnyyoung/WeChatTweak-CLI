@@ -60,15 +60,17 @@ struct Install: ParsableCommand {
         }.then {
             Command.cleanup()
         }.then {
-            Command.backup()
-        }.then {
             Command.download()
         }.then {
             Command.unzip()
         }.then {
+            Command.backup()
+        }.then {
+            Command.removeCodesign()
+        }.then {
             Command.insert()
         }.then {
-            Command.codesign()
+            Command.addCodesign()
         }.done {
             print("Install success!")
         }.catch { error in
@@ -104,7 +106,9 @@ struct Resign: ParsableCommand {
 
     func run() throws {
         firstly {
-            Command.codesign()
+            Command.removeCodesign()
+        }.then {
+            Command.addCodesign()
         }.catch { error in
             print("Resign failed: \(error.localizedDescription)")
         }.finally {

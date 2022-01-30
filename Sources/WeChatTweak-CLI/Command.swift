@@ -87,15 +87,14 @@ struct Command {
         }
     }
 
-    static func codesign() -> Promise<Void> {
-        print("------ Codesign ------")
-        return firstly {
-            Command.execute(command: "cp \(App.binary) \(Temp.binary)")
-        }.then {
-            Command.execute(command: "codesign --force --deep --sign - \(Temp.binary)")
-        }.then {
-            Command.execute(command: "cp \(Temp.binary) \(App.binary)")
-        }
+    static func removeCodesign() -> Promise<Void> {
+        print("------ Remove Codesign ------")
+        return Command.execute(command: "codesign --remove-sign \(App.binary)")
+    }
+
+    static func addCodesign() -> Promise<Void> {
+        print("------ Add Codesign ------")
+        return Command.execute(command: "codesign --force --deep --sign - \(App.binary)")
     }
 
     private static func execute(command: String) -> Promise<Void> {
