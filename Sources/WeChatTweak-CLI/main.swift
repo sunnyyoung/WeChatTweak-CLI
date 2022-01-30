@@ -1,3 +1,9 @@
+//
+//  main.swift
+//
+//  Created by Sunny Young.
+//
+
 import Foundation
 import Security
 import Alamofire
@@ -109,7 +115,7 @@ struct Resign: ParsableCommand {
 
 struct Tweak: ParsableCommand {
     static var configuration = CommandConfiguration(
-        commandName: "WeChatTwaek-CLI",
+        commandName: "wechattweak-cli",
         abstract: "A command line utility to work with WeChatTweak-macOS.",
         subcommands: [
             Install.self,
