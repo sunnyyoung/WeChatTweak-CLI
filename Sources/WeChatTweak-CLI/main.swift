@@ -5,11 +5,8 @@
 //
 
 import Foundation
-import Security
-import Alamofire
 import PromiseKit
 import ArgumentParser
-import insert_dylib
 
 struct Constant {
     static let url = URL(string: "https://github.com/Sunnyyoung/WeChatTweak-macOS/releases/latest/download/WeChatTweak.framework.zip")!
@@ -101,6 +98,34 @@ struct Uninstall: ParsableCommand {
     }
 }
 
+struct Version: ParsableCommand {
+    static var configuration = CommandConfiguration(abstract: "Get current version of WeChatTweak.")
+
+    func run() throws {
+        return firstly {
+            getVersion()
+        }.done { version in
+            print(version ?? "Unknown")
+        }.catch { error in
+            print("Get version failed: \(error)")
+        }.finally {
+            CFRunLoopStop(CFRunLoopGetCurrent())
+        }
+    }
+
+    func getVersion() -> Promise<String?> {
+        return Promise { seal in
+            do {
+                let data = try Data(contentsOf: URL(fileURLWithPath: App.framework.appending("/Versions/A/Resources/Info.plist")))
+                let info = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+                seal.fulfill((info as? [String: Any])?["CFBundleShortVersionString"] as? String)
+            } catch {
+                seal.reject(error)
+            }
+        }
+    }
+}
+
 struct Resign: ParsableCommand {
     static var configuration = CommandConfiguration(abstract: "Force resign WeChat.app")
 
@@ -124,7 +149,8 @@ struct Tweak: ParsableCommand {
         subcommands: [
             Install.self,
             Uninstall.self,
-            Resign.self
+            Resign.self,
+            Version.self
         ],
         defaultSubcommand: Self.self
     )
