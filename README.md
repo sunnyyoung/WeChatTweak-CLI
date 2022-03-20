@@ -40,7 +40,7 @@ $ brew install sunnyyoung/repo/wechattweak-cli
 1. Download the [WeChatTweak-CLI](https://github.com/Sunnyyoung/WeChatTweak-CLI/releases/latest/download/wechattweak-cli)
 2. Remove file attributes: `xattr -d com.apple.quarantine wechattweak-cli`
 3. Make sure the binary executable: `chmod +x wechattweak-cli`
-4. Run: `wechattweak-cli --install`
+4. Run: `sudo ./wechattweak-cli install`
 
 ## License
 
