@@ -16,6 +16,7 @@ SUBCOMMANDS:
   install                 Install or upgrade tweak.
   uninstall               Uninstall tweak.
   resign                  Force resign WeChat.app
+  version                 Get current version of WeChatTweak.
 
   See 'wechattweak-cli help <subcommand>' for detailed help.
 ```
