@@ -68,6 +68,8 @@ struct Install: ParsableCommand {
             Command.insert()
         }.then {
             Command.addCodesign()
+        }.then {
+            Command.resetPermission()
         }.done {
             print("Install success!")
         }.catch { error in

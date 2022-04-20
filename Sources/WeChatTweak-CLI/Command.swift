@@ -97,6 +97,11 @@ struct Command {
         return Command.execute(command: "codesign --force --deep --sign - \(App.binary)")
     }
 
+    static func resetPermission() -> Promise<Void> {
+        print("------ Reset ScreenCapture privacy permission ------")
+        return Command.execute(command: "tccutil reset ScreenCapture com.tencent.xinWeChat")
+    }
+
     private static func execute(command: String) -> Promise<Void> {
         return Promise { seal in
             print("Execute command: \(command)")
