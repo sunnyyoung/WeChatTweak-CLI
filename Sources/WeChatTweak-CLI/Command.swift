@@ -62,10 +62,10 @@ struct Command {
     static func download() -> Promise<Void> {
         print("------ Download ------")
         return Promise { seal in
-            let destination: DownloadRequest.DownloadFileDestination = { _, _ in
+            let destination: DownloadRequest.Destination = { _, _ in
                 return (.init(fileURLWithPath: Temp.zip), [.removePreviousFile])
             }
-            Alamofire.download(Constant.url, to: destination).response { response in
+            AF.download(Constant.url, to: destination).response { response in
                 if let error = response.error {
                     seal.reject(CLIError.downloading(error))
                 } else {
